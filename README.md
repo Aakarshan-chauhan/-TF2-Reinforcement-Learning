@@ -1,2 +1,2 @@
 # Reinforcement-Learning
-A repository to convert concepts provided by the RL book by Sutton and Barto
+A repository to store different types of RL and Deep RL algos i learn and code
