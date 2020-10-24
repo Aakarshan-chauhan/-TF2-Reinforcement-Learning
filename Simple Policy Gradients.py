@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import tqdm
 def get_network(input_shape, output_shape, hidden_units):
 	model = Sequential([
-		Dense(13, activation='tanh', input_shape=input_shape),
+		Dense(hidden_units, activation='tanh', input_shape=input_shape),
 		Dense(output_shape, activation='softmax')
 		])
 
@@ -66,6 +66,16 @@ def get_loss(actions, weights, obs, model):
 
 	return loss
 
+class debug_env:
+	def __init__(self):
+		self.obs_shape = np.array([0.]).shape
+		
+	def reset(self):
+		return np.array([0.])
+	def step(self, action):
+		if np.max(action)==1:
+			return np.array([0.]), np.array([1.]), True, {}
+		return np.array([0.]), np.array([0.]), True, {}
 
 def train(env, gamma, model, optimizer, batch_size=1000):
 
@@ -105,6 +115,7 @@ def train(env, gamma, model, optimizer, batch_size=1000):
 
 
 if __name__ == "__main__":
+
 	env = gym.make('CartPole-v0')
 	num_actions = env.action_space.n
 	optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
@@ -114,13 +125,15 @@ if __name__ == "__main__":
 	network = get_network(obs_shape, num_actions, 128)
 
 	total = []
-	for i in tqdm.tqdm(range(1000)):
+	print(f"before training: {network(sample_obs)}")
+	for i in tqdm.tqdm(range(500)):
 		rewards = train(env, 1, network, optimizer)
 		
 		total.append(np.mean(rewards))
 	
+	print(f"after training: {network(sample_obs)}")
 
 	plt.xlabel("Epochs")
-	plt.ylabel("total reward per episode")
+	plt.ylabel("total reward per epoch")
 	plt.plot(total)
 	plt.show()
