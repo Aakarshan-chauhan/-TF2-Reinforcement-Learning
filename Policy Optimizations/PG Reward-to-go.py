@@ -96,7 +96,7 @@ if __name__ == "__main__":
 	state_shape = tf.constant([sample_state]).shape
 	rets = []
 	model = get_network(state_shape, num_actions, 128)
-	for i in tqdm.tqmd(range(300)):
+	for i in tqdm.tqdm(range(300)):
 		rets.append(tf.reduce_mean(train(env, model)))
 
 	plt.xlabel("epochs")
