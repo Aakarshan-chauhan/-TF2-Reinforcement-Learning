@@ -73,7 +73,7 @@ def play_one_epoch(env, model, value_model):
 		action = get_actions(obs, model)[0]
 
 		obs, reward, done, info = env.step(action.numpy())
-
+		reward = (-25 if done else 1)
 
 		episode_rewards.append(reward)
 		batch_actions.append(action)
@@ -108,14 +108,14 @@ def train(env, policy_model, value_model):
 	optimizer.apply_gradients(zip(vgrads, value_model.trainable_variables))
 
 	del(tape)
-	return rewards
+	return np.mean(rewards)
 
 if __name__ == "__main__":
 	env = gym.make("CartPole-v0")
 	state = env.observation_space.sample()
 	state_shape = np.array([state]).shape
 	num_actions = env.action_space.n
-	num_epochs=50
+	num_epochs=20
 	total = []
 
 	policy_model = get_model(state_shape, num_actions, 128)
@@ -125,6 +125,6 @@ if __name__ == "__main__":
 		total += rewards
 	
 	plt.xlabel("Epochs")
-	plt.ylabel("Rewards per episode")
+	plt.ylabel("Mean rewards per epoch")
 	plt.plot(total)
 	plt.show()
