@@ -29,7 +29,7 @@ def get_values(obs,model):
 	return value
 
 def get_returns(rewards):
-	gamma = 0.99
+	gamma = 1
 	n = len(rewards)
 	returns = np.empty_like(rewards)
 
