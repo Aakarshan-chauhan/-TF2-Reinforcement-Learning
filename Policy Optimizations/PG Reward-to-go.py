@@ -41,7 +41,7 @@ def getLoss(obs, actions, weights, model ):
 	return -tf.reduce_mean(weights * log_probs)
 
 
-def play_one_epoch(env, model, experiance_len=1000, render = False):
+def play_one_epoch(env, model, experiance_len=5000, render = False):
 	batch_returns= []
 	batch_actions= []
 	batch_obs = []
@@ -57,10 +57,7 @@ def play_one_epoch(env, model, experiance_len=1000, render = False):
 		action = getActions(model, obs.reshape(1,-1))[0]
 		obs, reward, done, info = env.step(action.numpy())
 
-		if not done:
-			reward = 1
-		else:
-			reward = -23
+		reward = (-1 if done else 1)
 		batch_actions.append(action)
 		episode_rewards.append(reward)
 
@@ -96,7 +93,7 @@ if __name__ == "__main__":
 	state_shape = tf.constant([sample_state]).shape
 	rets = []
 	model = get_network(state_shape, num_actions, 128)
-	for i in tqdm.tqdm(range(300)):
+	for i in tqdm.tqdm(range(50)):
 		rets.append(tf.reduce_mean(train(env, model)))
 
 	plt.xlabel("epochs")

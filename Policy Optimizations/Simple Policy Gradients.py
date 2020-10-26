@@ -39,7 +39,7 @@ def get_loss(obs, actions, weights, model):
 
 def play_one_epoch(env,model):
 
-	exp_size=1000
+	exp_size=5000
 
 	batch_weights = []
 	batch_rewards = []
@@ -54,7 +54,7 @@ def play_one_epoch(env,model):
 
 		obs, _, done, info = env.step(action.numpy())
 		
-		reward = (-25 if done else 1)
+		reward = (-1 if done else 1)
 		batch_actions.append(action)
 		episode_rewards.append(reward)
 
