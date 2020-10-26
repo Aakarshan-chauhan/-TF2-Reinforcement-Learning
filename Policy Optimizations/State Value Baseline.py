@@ -47,9 +47,9 @@ def get_loss(obs, actions, weights, model):
 	action_masks = tf.one_hot(actions, num_actions)
 	log_actions = tf.reduce_sum(action_masks * tf.nn.log_softmax(logits), axis=1)
 	
-	advantage = weights - values
+	with_baseline = weights - values
 	
-	policy_model_loss = -tf.reduce_mean(log_actions * advantage)
+	policy_model_loss = -tf.reduce_mean(log_actions * with_baseline)
 	value_model_loss = tf.reduce_mean((values - weights)**2)
 	return policy_model_loss, value_model_loss
 
