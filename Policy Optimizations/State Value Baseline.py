@@ -25,7 +25,6 @@ def get_actions(obs, model):
 
 def get_values(obs,model):
 	value = model(obs)
-	value = tf.reduce_max(value)
 	return value
 
 def get_returns(rewards):
@@ -65,20 +64,22 @@ def play_one_epoch(env, model, value_model):
 
 	obs = env.reset()
 
+	steps = 0
 	while True:
-		
+		steps +=1
 		batch_obs.append(obs)
 		obs = np.array([obs])
 
 		action = get_actions(obs, model)[0]
 
 		obs, reward, done, info = env.step(action.numpy())
-		reward = (-1 if done else 1)
+		reward = (steps if done else 1)
 
 		episode_rewards.append(reward)
 		batch_actions.append(action)
 
 		if done:
+			steps = 0
 			batch_rewards.append(np.sum(episode_rewards))
 			batch_weights += list(get_returns(episode_rewards))
 			

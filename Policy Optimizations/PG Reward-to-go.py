@@ -51,17 +51,20 @@ def play_one_epoch(env, model, experiance_len=5000, render = False):
 	batch_weights= []
 	obs = env.reset()
 	
+	steps = 0
 	while True:
+		steps+=1
 		batch_obs.append(obs)
 
 		action = getActions(model, obs.reshape(1,-1))[0]
 		obs, reward, done, info = env.step(action.numpy())
 
-		reward = (-1 if done else 1)
+		reward = (steps if done else 1)
 		batch_actions.append(action)
 		episode_rewards.append(reward)
 
 		if done:
+			steps=0
 			ep_ret, ep_len = sum(episode_rewards), len(episode_rewards)
 			batch_returns.append(ep_ret)
 			batch_lens.append(ep_len)
