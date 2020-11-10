@@ -53,7 +53,7 @@ def get_loss(obs, actions, weights, model):
 	return policy_model_loss, value_model_loss
 
 def play_one_epoch(env, model, value_model):
-	experience_len = 5000
+	experience_len = 1000
 	batch_obs = []
 	batch_actions=[] 
 	batch_rewards = []
