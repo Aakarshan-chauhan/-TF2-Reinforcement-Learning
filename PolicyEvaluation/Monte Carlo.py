@@ -22,25 +22,31 @@ def play():
 	done = False
 	s = env.reset()
 	states.append(s)
+	try:
+		N[s] +=1
+	except:
+		N[s] = 1
+		V[s] = 0
+		
 	while not done:
-		try:
-			N[s] +=1
-		except:
-			N[s] = 0
 		s, r, done, info = env.step(env.action_space.sample())
 		states.append(s)
 		rewards.append(r)
+		try:
+			N[s] +=1
+		except:
+			N[s] = 1
+			V[s] = 0
+		
 
 	returns = get_returns(states,rewards)
 	return returns
 
 def get_values(returns):
 	for i in returns.keys():
-		try:
-			V[i] += (returns[i] - V[i])/N[i]
-		except:
-			V[i] = 0
+		V[i] += (returns[i] - V[i])/N[i]
 	return V
+
 if __name__=="__main__":
 	env = gym.make('Taxi-v3')
 	N = {}
