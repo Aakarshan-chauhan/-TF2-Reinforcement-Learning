@@ -3,13 +3,15 @@ import gym
 import matplotlib.pyplot as plt
 
 num_actions = 10
+
+
 def init_Q(state):
 	try:
 		temp = Q[(state, 1)]
 	except:
 		for a in acts:
 			Q[(state, a)] = 0.
-
+'''
 class testEnv:
 	def __init__(self):
 		self.state = np.random.randint(10)
@@ -36,14 +38,13 @@ class testEnv:
 	def sample(self):
 		return np.random.randint(num_actions)
 
-
+'''
 
 def get_action(state):
 	eps = 0.01
 
 	if np.random.random() < eps:
-		#return env.action_space.sample()
-		return env.sample()
+		return env.action_space.sample()
 
 	for a in acts:
 		try:
@@ -105,10 +106,10 @@ def play():
 	return sum(rewards)
 
 if __name__ == "__main__":
-	#env = gym.make('Taxi-v3')
+	env = gym.make('NChain-v0')
 
-	env = testEnv()
-	acts = list(range(num_actions))
+	#env = testEnv()
+	acts = list(range(env.action_space.n))
 	Q = {}
 	N = {}
 	rews = []
@@ -116,5 +117,9 @@ if __name__ == "__main__":
 	for i in range(1000):
 		rews.append(play())
 
+	plt.xlabel('Episodes')
+	plt.ylabel('Rewards')
+
 	plt.plot(rews)
+
 	plt.show()
