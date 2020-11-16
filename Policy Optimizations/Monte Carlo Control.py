@@ -42,8 +42,8 @@ def get_action(state):
 	eps = 0.01
 
 	if np.random.random() < eps:
-		return env.action_space.sample()
-		#return env.sample()
+		#return env.action_space.sample()
+		return env.sample()
 
 	for a in acts:
 		try:
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 	#env = gym.make('Taxi-v3')
 
 	env = testEnv()
-	acts = list(range(env.))
+	acts = list(range(num_actions))
 	Q = {}
 	N = {}
 	rews = []
