@@ -1,9 +1,7 @@
 import numpy as np
-import gym
 import matplotlib.pyplot as plt
-
-num_actions = 10
-
+import tqdm
+num_actions = 4
 
 def init_Q(state):
 	try:
@@ -11,10 +9,10 @@ def init_Q(state):
 	except:
 		for a in acts:
 			Q[(state, a)] = 0.
-'''
+
 class testEnv:
 	def __init__(self):
-		self.state = np.random.randint(10)
+		self.state = np.random.randint(4)
 		self.steps = 0
 	def step(self, action):
 		self.steps +=1
@@ -38,14 +36,11 @@ class testEnv:
 	def sample(self):
 		return np.random.randint(num_actions)
 
-'''
 
 def get_action(state):
-	eps = 0.01
 
 	if np.random.random() < eps:
-		return env.action_space.sample()
-
+		return env.sample()
 	for a in acts:
 		try:
 			maxs, besta = ((Q[(state, a)], a) if Q[(state,a)] > maxs else (maxs, besta))
@@ -106,20 +101,21 @@ def play():
 	return sum(rewards)
 
 if __name__ == "__main__":
-	env = gym.make('NChain-v0')
-
-	#env = testEnv()
-	acts = list(range(env.action_space.n))
+	env = testEnv()
+	acts = list(range(num_actions))
 	Q = {}
 	N = {}
 	rews = []
 	s = env.reset()
-	for i in range(1000):
+	eps = 0.6
+	for i in tqdm.tqdm(range(10000)):
 		rews.append(play())
+		eps = 0.6/6
 
+	avg_100_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
 	plt.xlabel('Episodes')
 	plt.ylabel('Rewards')
 
-	plt.plot(rews)
+	plt.plot(avg_100_rewards)
 
 	plt.show()
