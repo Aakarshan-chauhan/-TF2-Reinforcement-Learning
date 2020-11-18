@@ -1,27 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
-num_actions = 4
+num_actions = 10
 
-def init_Q(state):
-	try:
-		temp = Q[(state, 1)]
-	except:
-		for a in acts:
-			Q[(state, a)] = 0.
 
 class testEnv:
 	def __init__(self):
-		self.state = np.random.randint(4)
+		self.state = np.random.randint(10)
 		self.steps = 0
 	def step(self, action):
 		self.steps +=1
 
 		done = False
-		if self.steps == 10:
+		if self.steps == 3:
 			done = True
 
-		if action == self.state:
+		if action == 3:
 			self.state= np.random.randint(10)
 			return self.state, 1, done, None
 		else:
@@ -37,16 +31,22 @@ class testEnv:
 		return np.random.randint(num_actions)
 
 
+
+def init_Q(state):
+	try:
+		temp = Q[state]
+	except:
+		Q[state] = np.zeros(num_actions)
+
+
+
+
 def get_action(state):
 
 	if np.random.random() < eps:
 		return env.sample()
-	for a in acts:
-		try:
-			maxs, besta = ((Q[(state, a)], a) if Q[(state,a)] > maxs else (maxs, besta))
-		except:
-			maxs = Q[(state, a)]
-			besta = a
+	
+	besta = np.argmax(Q[state])
 
 	return besta
 
@@ -60,15 +60,17 @@ def get_returns(states, rewards):
 		gprev = g[s]
 	return g
 
+
 def update_Q(states, actions, rewards, returns):
 	for i in reversed(range(len(states))):
 		if i == len(states)-1:
-			Q[(states[i], actions[i])] = Q[(states[i], actions[i])] + (returns[states[i]])/N[states[i]]
+			Q[states[i]][actions[i]] = Q[states[i]][actions[i]] + (returns[states[i]])/N[states[i]]
 	
 
 		else:
-			Q[(states[i], actions[i])] = Q[(states[i], actions[i])] + (returns[states[i]] - Q[(states[i+1], actions[i+1])])/N[states[i]]
+			Q[states[i]][actions[i]] = Q[states[i]][actions[i]] + (returns[states[i]] - Q[states[i+1]][actions[i+1]])/N[states[i]]
 	
+
 def play():
 
 	states = []
@@ -107,10 +109,10 @@ if __name__ == "__main__":
 	N = {}
 	rews = []
 	s = env.reset()
-	eps = 0.6
-	for i in tqdm.tqdm(range(10000)):
+	eps = 1
+	for i in tqdm.tqdm(range(2000)):
 		rews.append(play())
-		eps = 0.6/6
+		eps = 2/(i+1)
 
 	avg_100_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
 	plt.xlabel('Episodes')
@@ -118,4 +120,7 @@ if __name__ == "__main__":
 
 	plt.plot(avg_100_rewards)
 
+	plt.show()
+	z = np.array(list(N.items()))[:,1].tolist()
+	plt.bar(list(N.keys()), z)
 	plt.show()
