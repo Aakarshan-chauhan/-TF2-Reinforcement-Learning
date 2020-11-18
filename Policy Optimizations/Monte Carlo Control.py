@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
-num_actions = 10
+num_actions = 15
 
 
 class testEnv:
@@ -54,7 +54,7 @@ def get_returns(states, rewards):
 	g = {}
 	for s in states:
 		g[s] = 0.
-	gprev = 0
+	gprev = 0.
 	for s, r in zip(reversed(states), reversed(rewards)):
 		g[s] = r + 0.99 * gprev
 		gprev = g[s]
@@ -83,7 +83,7 @@ def play():
 	try:
 		N[s] +=1
 	except: 
-		N[s] = 1
+		N[s] = 1.
 
 	while not done:
 		a = get_action(s)
@@ -96,7 +96,7 @@ def play():
 		try:
 			N[s] +=1
 		except: 
-			N[s] = 1
+			N[s] = 1.
 	returns = get_returns(states, rewards)
 	actions.append(a)
 	update_Q(states, actions, rewards, returns)
