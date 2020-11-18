@@ -12,10 +12,10 @@ class testEnv:
 		self.steps +=1
 
 		done = False
-		if self.steps == 3:
+		if self.steps == 10:
 			done = True
 
-		if action == 3:
+		if action == self.state:
 			self.state= np.random.randint(10)
 			return self.state, 1, done, None
 		else:
@@ -110,7 +110,7 @@ if __name__ == "__main__":
 	rews = []
 	s = env.reset()
 	eps = 1
-	for i in tqdm.tqdm(range(2000)):
+	for i in tqdm.tqdm(range(10000)):
 		rews.append(play())
 		eps = 2/(i+1)
 
