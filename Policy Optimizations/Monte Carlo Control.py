@@ -6,8 +6,10 @@ num_actions = 15
 
 class testEnv:
 	def __init__(self):
-		self.state = np.random.randint(10)
+		self.state = 0
 		self.steps = 0
+		self.old_action = np.random.randint(5)
+
 	def step(self, action):
 		self.steps +=1
 
@@ -15,16 +17,17 @@ class testEnv:
 		if self.steps == 10:
 			done = True
 
-		if action == self.state:
-			self.state= np.random.randint(10)
-			return self.state, 1, done, None
+		if action >= self.old_action:
+			self.state= self.steps
+			self.old_action = action
+			return self.state, 10, done, None
 		else:
-			self.state= np.random.randint(10)
+			self.state= self.steps
 			return self.state, -1, done, None
-
+		
 	def reset(self):
-		self.state = np.random.randint(10)
 		self.steps = 0
+		self.state = self.steps
 		return self.state
 
 	def sample(self):

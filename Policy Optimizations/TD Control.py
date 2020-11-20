@@ -5,8 +5,10 @@ import matplotlib.pyplot as plt
 num_actions = 10
 class testEnv:
 	def __init__(self):
-		self.state = np.random.randint(0,10)
+		self.state = 0
 		self.steps = 0
+		self.old_action = np.random.randint(5)
+
 	def step(self, action):
 		self.steps +=1
 
@@ -14,20 +16,23 @@ class testEnv:
 		if self.steps == 10:
 			done = True
 
-		if action == self.state:
-			self.state= np.random.randint(0,10)
+		if action >= self.old_action:
+			self.state= self.steps
+			self.old_action = action
 			return self.state, 1, done, None
 		else:
-			self.state= np.random.randint(0,10)
+			self.state= self.steps
 			return self.state, -1, done, None
-
+		
 	def reset(self):
-		self.state = np.random.randint(0,10)
 		self.steps = 0
+		self.state = self.steps
 		return self.state
 
 	def sample(self):
 		return np.random.randint(num_actions)
+
+
 
 
 def init_Q(state):
@@ -72,12 +77,12 @@ if __name__ == "__main__":
 
 	gamma = 0.99
 	alpha = 0.01
-	eps = 0.01
+	eps = 0.1
 	rews = []
 	for i in tqdm.tqdm(range(8000)):
 		rews.append(play_one())
 		if i > 5000:
-			eps = 0
+			eps = 0.01
 	avg_100_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
 	plt.xlabel('Episodes')
 	plt.ylabel('Rewards')
