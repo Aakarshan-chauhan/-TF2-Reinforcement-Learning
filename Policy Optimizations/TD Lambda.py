@@ -3,13 +3,11 @@ import matplotlib.pyplot as plt
 import tqdm
 num_actions = 15
 
-
 class testEnv:
 	def __init__(self):
-		self.state = np.random.randint(10)
+		self.state = 0
 		self.steps = 0
-		self.old_action = 0
-
+		self.old_action = np.random.randint(5)
 
 	def step(self, action):
 		self.steps +=1
@@ -19,20 +17,21 @@ class testEnv:
 			done = True
 
 		if action >= self.old_action:
-			self.state= np.random.randint(10)
+			self.state= self.steps
+			self.old_action = action
 			return self.state, 1, done, None
 		else:
-			self.state= np.random.randint(10)
+			self.state= self.steps
 			return self.state, -1, done, None
-
-		self.old_action = action
+		
 	def reset(self):
-		self.state = np.random.randint(10)
 		self.steps = 0
+		self.state = self.steps
 		return self.state
 
 	def sample(self):
 		return np.random.randint(num_actions)
+
 
 
 def init_Q(state):
@@ -61,6 +60,8 @@ def get_action(state):
 def update_QE(td_error):
 	for s in Q.keys():
 		for a in range(num_actions):
+			init_Q(s)
+			init_E(s)
 			Q[s][a] = Q[s][a] + alpha*td_error*E[s][a]
 			E[s][a] = gamma*lam*E[s][a]
 
@@ -84,7 +85,6 @@ def play_one():
 		init_E(s)
 
 		a = get_action(s)
-		print(old_s, old_a)
 		td_error = r + gamma*Q[s][a] - Q[old_s][old_a]
 		E[old_s][old_a] = E[old_s][old_a] + 1
 
@@ -99,7 +99,18 @@ if __name__ == "__main__":
 	Q = {}
 	alpha = 0.01
 	gamma = 0.99
-	lam = 0.1
+	lam = 0.4
 	eps = 0.1
-	E = {}
-	print(play_one())
+	rews= []
+	for i in tqdm.tqdm(range(500)):
+		E = {}
+		rews.append(play_one())
+		
+
+	avg_10_rewards = [np.mean(rews[i:i+10]) for i in range(len(rews)- 10)]
+	plt.xlabel('Episodes')
+	plt.ylabel('Rewards')
+
+	plt.plot(avg_10_rewards)
+
+	plt.show()
