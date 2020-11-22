@@ -100,11 +100,12 @@ if __name__ == "__main__":
 	N = {}
 	Q = {}
 	gamma = 0.99
-	eps = 0.1
 	rews= []
-	for i in range(20000):
-		rews.append(play_one())
+	eps = 0.1
+	for i in tqdm.trange(2000):
 		
+		rews.append(play_one())
+		eps *=0.999
 
 	avg_10_rewards = [np.mean(rews[i:i+10]) for i in range(len(rews)- 10)]
 	plt.xlabel('Episodes')
