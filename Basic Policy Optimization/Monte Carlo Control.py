@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import tqdm
 num_actions = 15
 
-
 class testEnv:
 	def __init__(self):
 		self.state = 0
@@ -20,7 +19,7 @@ class testEnv:
 		if action >= self.old_action:
 			self.state= self.steps
 			self.old_action = action
-			return self.state, 10, done, None
+			return self.state, 1, done, None
 		else:
 			self.state= self.steps
 			return self.state, -1, done, None
@@ -33,8 +32,6 @@ class testEnv:
 	def sample(self):
 		return np.random.randint(num_actions)
 
-
-
 def init_Q(state):
 	try:
 		temp = Q[state]
@@ -42,7 +39,12 @@ def init_Q(state):
 		Q[state] = np.zeros(num_actions)
 
 
-
+def add_N(state, action):
+	try:
+		N[state][action] += 1
+	except:
+		N[state] =np.zeros(num_actions)
+		N[state][action] += 1
 
 def get_action(state):
 
@@ -54,76 +56,61 @@ def get_action(state):
 	return besta
 
 def get_returns(states, rewards):
-	g = {}
-	for s in states:
-		g[s] = 0.
-	gprev = 0.
-	for s, r in zip(reversed(states), reversed(rewards)):
-		g[s] = r + 0.99 * gprev
-		gprev = g[s]
-	return g
-
-
-def update_Q(states, actions, rewards, returns):
+	old_G = 0.0
+	G = {}
 	for i in reversed(range(len(states))):
-		if i == len(states)-1:
-			Q[states[i]][actions[i]] = Q[states[i]][actions[i]] + (returns[states[i]])/N[states[i]]
-	
+		G[states[i]] = rewards[i] + gamma*old_G
+		old_G = G[states[i]]
+	return G
 
-		else:
-			Q[states[i]][actions[i]] = Q[states[i]][actions[i]] + (returns[states[i]] - Q[states[i+1]][actions[i+1]])/N[states[i]]
-	
+def update_Q(states, returns, actions):
+	for i in range(len(states)):
+		step_size = 1./N[states[i]][actions[i]]
+		Q[states[i]][actions[i]] = Q[states[i]][actions[i]] + step_size*(returns[states[i]] - Q[states[i]][actions[i]])
 
-def play():
-
+def play_one():
 	states = []
 	actions = []
 	rewards = []
-	s = env.reset()
+
 	done = False
+
+	s = env.reset()
 	init_Q(s)
 	states.append(s)
-	try:
-		N[s] +=1
-	except: 
-		N[s] = 1.
 
 	while not done:
 		a = get_action(s)
+		actions.append(a)
+		add_N(s, a)
 		s, r, done, info = env.step(a)
+		init_Q(s)
 		states.append(s)
 		rewards.append(r)
-		actions.append(a)
-		init_Q(s)
-
-		try:
-			N[s] +=1
-		except: 
-			N[s] = 1.
-	returns = get_returns(states, rewards)
+	
 	actions.append(a)
-	update_Q(states, actions, rewards, returns)
-	return sum(rewards)
+	add_N(s,a)
+	rewards.append(r)
+	G = get_returns(states, rewards)
+	update_Q(states, G, actions)
+	return np.sum(rewards)
 
 if __name__ == "__main__":
 	env = testEnv()
-	acts = list(range(num_actions))
-	Q = {}
 	N = {}
-	rews = []
-	s = env.reset()
-	eps = 1
-	for i in tqdm.tqdm(range(10000)):
-		rews.append(play())
-		eps = 2/(i+1)
+	Q = {}
+	gamma = 0.99
+	eps = 0.1
+	rews= []
+	for i in range(20000):
+		rews.append(play_one())
+		
 
-	avg_100_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
+	avg_10_rewards = [np.mean(rews[i:i+10]) for i in range(len(rews)- 10)]
 	plt.xlabel('Episodes')
 	plt.ylabel('Rewards')
 
-	plt.plot(avg_100_rewards)
+	plt.plot(avg_10_rewards)
 
 	plt.show()
-	z = np.array(list(N.items()))[:,1].tolist()
-	plt.bar(list(N.keys()), z)
-	plt.show()
+		
