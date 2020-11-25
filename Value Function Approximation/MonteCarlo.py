@@ -31,8 +31,8 @@ def updatemodel(states, actions, returns):
 
 	with tf.GradientTape() as tape:
 		preds = model(tf.reshape(states, (-1,len_states)))
-		pred = tf.gather(preds, actions)
-
+		action_batch = [[i, actions[i]] for i in range(len(actions))]
+		pred = tf.gather_nd(preds, action_batch)
 		error = losses(returns, pred)
 	grads = tape.gradient(error, model.trainable_variables)
 
@@ -69,10 +69,10 @@ def play():
 if __name__ == "__main__":
 	env = gym.make("CartPole-v0")
 	gamma = 0.99
-	optimizer = tf.keras.optimizers.SGD()
+	optimizer = tf.keras.optimizers.Adam()
 	len_states= len(env.reset())
 	num_actions = env.action_space.n
-	losses = tf.keras.losses.MSE
+	losses = tf.keras.losses.Huber()
 	model = get_model()
 	rews= []
 
