@@ -33,7 +33,7 @@ def updatemodel(states, actions, returns):
 		preds = model(tf.reshape(states, (-1,len_states)))
 		pred = tf.gather(preds, actions)
 
-		error = losses(returns, preds)
+		error = losses(returns, pred)
 	grads = tape.gradient(error, model.trainable_variables)
 
 	optimizer.apply_gradients(zip(grads, model.trainable_variables))
@@ -76,12 +76,12 @@ if __name__ == "__main__":
 	model = get_model()
 	rews= []
 
-	eps = 0.1
-	for i in tqdm.trange(2000):
-		
+	
+	for i in tqdm.trange(500):
+		eps = 1 / np.sqrt(i+1)
 		rews.append(play())
 
-	avg_10_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
+	avg_10_rewards = [np.mean(rews[i:i+10]) for i in range(len(rews)- 10)]
 	plt.xlabel('Episodes')
 	plt.ylabel('Rewards')
 
