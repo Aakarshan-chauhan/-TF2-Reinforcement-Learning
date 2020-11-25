@@ -1,25 +1,91 @@
-import tensorflow as tf
 import numpy as np
-import random
+import matplotlib.pyplot as plt
+import tqdm
+import tensorflow as tf
+import gym
 
-out = [10,20,30.4, 12.3, 5.3]
-s = tf.constant(out, dtype=np.float32)/10.
-out = tf.expand_dims(out, 1)
-s = tf.expand_dims(s, 1)
-print(s)
-print(out)
+def get_model():
+	model = tf.keras.models.Sequential([
+		tf.keras.layers.Dense(num_actions, activation='linear')
+		])
+	return model
 
-W = tf.Variable(1, trainable=True, name="Weights", dtype=tf.float32)
-)
-for i in range(100):
+def get_action(state):
+	state = np.expand_dims(state, 0).astype(np.float32)
+	Q = model(state)
+	if np.random.random() < eps:
+		return env.action_space.sample()
+	return tf.argmax(Q, axis=1)[0].numpy()
+
+def get_returns(rewards, states):
+	old_g = 0.
+	G = np.empty((len(states)))
+
+	for i in reversed(range(len(rewards))):
+		G[i] = rewards[i] + gamma*old_g
+		old_g = G[i]
+
+	return G
+
+def updatemodel(states, actions, returns):
+
 	with tf.GradientTape() as tape:
+		preds = model(tf.reshape(states, (-1,len_states)))
+		pred = tf.gather(preds, actions)
 
-		preds= [W]*s
-		error = tf.reduce_mean((preds - out)**2)
-	grads = tape.gradient(error, [W])[0].numpy()
-	delta_W = 0.01* grads* tf.reduce_mean(preds - out)
-	print(f"Delta W = {delta_W}")
-	W.assign_add(delta_W)
+		error = losses(returns, preds)
+	grads = tape.gradient(error, model.trainable_variables)
 
-x = float(input("Enter a number: "))
-print(f"Your number is : {x * W}")
+	optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+def play():
+	states = []
+	actions = []
+	rewards = []
+
+	done = False
+	s = env.reset()
+	states.append(s)
+	rewards.append(0)
+	stepcount = 0
+	while not done:
+		stepcount+=1
+		a = get_action(s)
+		actions.append(a)
+
+		s,r,done,info = env.step(a)
+
+		states.append(s)
+		rewards.append(r)
+	
+	actions.append(a)
+
+
+	returns = get_returns(rewards, states)
+	returns = tf.expand_dims(returns, 1)
+	updatemodel(states, actions , returns)
+	return tf.reduce_sum(rewards)
+
+if __name__ == "__main__":
+	env = gym.make("CartPole-v0")
+	gamma = 0.99
+	optimizer = tf.keras.optimizers.SGD()
+	len_states= len(env.reset())
+	num_actions = env.action_space.n
+	losses = tf.keras.losses.MSE
+	model = get_model()
+	rews= []
+
+	eps = 0.1
+	for i in tqdm.trange(2000):
+		
+		rews.append(play())
+
+	avg_10_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
+	plt.xlabel('Episodes')
+	plt.ylabel('Rewards')
+
+	plt.plot(avg_10_rewards)
+
+	plt.show()
+		
