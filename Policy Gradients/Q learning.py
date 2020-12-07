@@ -61,7 +61,8 @@ class Agent():
 
 		self.buffer = ReplayBuffer(buffer_size, observation_dims, n_actions)
 		self.dqn = get_DQN(observation_dims, n_actions, hidden_units, learning_rate)
-		
+		self.dqn2 = get_DQN(observation_dims, n_actions, hidden_units, learning_rate)
+
 		self.gamma = gamma
 		self.e = epsilon
 		self.e_dec = epsilon_dec
@@ -88,7 +89,7 @@ class Agent():
 		observations, next_observations, actions, rewards, terminates = self.buffer.get_exp(self.batch_size)
 		
 		Q = self.dqn.predict(observations)
-		Q_next = self.dqn.predict(next_observations)
+		Q_next = self.dqn2.predict(next_observations)
 
 		targets = Q.copy()
 		indices = np.arange(self.batch_size, dtype=np.int64)
@@ -98,7 +99,8 @@ class Agent():
 		_ = self.dqn.fit(observations, targets, verbose=0)
 
 		self.e = self.e * self.e_dec if self.e > self.e_min else self.e_min
-
+	def copy_weights(self):
+		self.dqn2.set_weights(self.dqn.get_weights())
 
 if __name__=='__main__':
 	tf.compat.v1.disable_eager_execution()
@@ -108,9 +110,9 @@ if __name__=='__main__':
 
 	agent = Agent(buffer_size=64, observation_dims=state_dims, n_actions=n_actions)
 	
-	n_games = 500
+	n_games = 501
 	scores = []
-	avg_score = []
+	avg_scores = []
 	with tqdm.trange(n_games) as t:
 		for i in t:
 			done = False
@@ -126,20 +128,27 @@ if __name__=='__main__':
 				score += r
 			scores.append(score)
 			avg_score = np.mean(scores[max(0, i-100): (i+1)])
+			avg_scores.append(avg_score)
 			t.set_description(f"Episode= {i}")
 			t.set_postfix(Average_reward = avg_score,
 				 Buffer_Size = agent.buffer.buffer_cntr)
+			if i%10==0:
+				agent.copy_weights()
 			if i % 50 ==0:
-				env2 = wrappers.Monitor(env, 'D:/My C and Python Projects/Repos/Reinforcement-Learning/Policy Gradients/results/DQN_episode' + str(i) + '/')
+				env2 = wrappers.Monitor(env, 'D:/My C and Python Projects/Repos/Reinforcement-Learning/Policy Gradients/results/DQN/DQN_episode' + str(i) + '/', force=True)
 
 				done = False
 				s = env2.reset()
 				while not done:
-					env2.render()
 					a = agent.get_action(s)
 					s_, r, done, info = env2.step(a)
 					s = s_
 				
 				env2.close()
 
-
+	plt.title("Deep Q Learning: Lunar Lander")
+	plt.xlabel("Episodes")
+	plt.ylabel("Average Rewards")
+	plt.plot(avg_scores, label="Qlearning")
+	plt.legend()
+	plt.show()

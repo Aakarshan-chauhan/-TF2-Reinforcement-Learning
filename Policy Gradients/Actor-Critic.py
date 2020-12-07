@@ -1,134 +1,114 @@
 import tensorflow as tf
-import gym
+import gym 
+from gym import wrappers
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense
+import tensorflow_probability as tfp
 import numpy as np
-import matplotlib.pyplot as plt
 import tqdm
-
-class DistLayers(tf.keras.layers.Layer):
-	def call(self, logits):
-		return tf.random.categorical(logits, 1)
-
-class Model(tf.keras.Model):
+class ActorCritic(Model):
 	def __init__(self, num_actions):
-		super().__init__('mlp_policy')
-		self.hidden1 = tf.keras.layers.Dense(128,activation='relu')
-		self.hidden2 = tf.keras.layers.Dense(128,activation='relu')
+		super(ActorCritic, self).__init__()
 
-		self.policy = tf.keras.layers.Dense(num_actions)
-		self.values = tf.keras.layers.Dense(1)
-		self.actions = DistLayers()
+		self.num_actions = num_actions
+		self.fc1 = Dense(256, activation='relu')
+		self.fc2 = Dense(256, activation='relu')
+		self.v = Dense(1, activation=None)
+		self.pi = Dense(num_actions, activation='softmax')
+	
+	def call(self, obs):
+		x = self.fc1(obs)
+		x = self.fc2(x)
+		v = self.v(x)
+		pi = self.pi(x)
+		return v, pi
 
-	def __call__(self, obs):
-		obs = tf.convert_to_tensor(obs)
-		obs = tf.reshape(obs, (-1, *state_shape))
+class Agent:
+	def __init__(self, obs_dims, num_actions, gamma, learning_rate):
+		self.model = ActorCritic(num_actions)
+		self.num_actions = num_actions
 
-		x = self.hidden1(obs)
-		x = self.policy(x)
+		self.gamma = gamma
+		self.alpha = learning_rate
+		self.obs_dims = obs_dims
+		self.action= None
 
-		y = self.hidden2(obs)
-		y = self.values(y)
-
-		return x, y
+		self.optimizer= tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
 	def get_action(self, obs):
-		logits, values = self.__call__(obs)
+		obs = tf.reshape(obs, (-1, self.obs_dims))
+		v, pi = self.model.predict(obs)
 
-		x = self.actions(logits)
-		return tf.squeeze(x, axis=-1), tf.squeeze(values, axis=-1)
-
-def get_samples(buffer_size=128):
-	observations = tf.TensorArray(dtype=tf.float32, size=buffer_size, element_shape=state_shape, name="OBSERVATIONS")
-	actions = tf.TensorArray(dtype=tf.float32, size=buffer_size, name="ACTIONS")
-	rewards = tf.TensorArray(dtype=tf.float32, size=buffer_size, name="REWARDS")
+		action_probabilities = tfp.distributions.Categorical(probs = pi)
+		action = action_probabilities.sample()
+		self.action = action
+		return action.numpy()[0]
 
 
-	obs = env.reset()
-	done = False
-	
-	total_rewards = [0]
-	for i in tf.range(buffer_size):
-		old_obs = obs
-		a, vals = model.get_action(obs)
-		a = a[0]
-		# update the observations and actions
-		observations = observations.write(i, tf.cast(obs, tf.float32))
-		actions = actions.write(i, tf.cast(a, tf.float32))
-
-		obs, r, done, info = env.step(a.numpy())
-		# update the rewards and done flags
-
+	def learn(self, obs, obs_, reward, done):
+		obs = tf.reshape(obs, (-1, self.obs_dims))
+		obs_ = tf.reshape(obs_, (-1 , self.obs_dims))
+		reward = tf.convert_to_tensor(reward, dtype=tf.float32)
 		
+		with tf.GradientTape(persistent=True) as tape:
+			V, pi = self.model(obs)
+			V_ , _ = self.model(obs_)
 
-		total_rewards[-1]+=r
-		rewards = rewards.write(i, tf.cast(total_rewards[-1], tf.float32))
-		if done:
-			obs = env.reset()
-			total_rewards.append(0.)
+			returns = tf.stop_gradient(reward + self.gamma * V_ * (1-int(done)))
+			prob = tfp.distributions.Categorical(probs=pi)
+			log_prob = prob.log_prob(self.action)
+			delta = returns - V
 
-	observations = observations.stack()
-	actions = actions.stack()
-	rewards = rewards.stack()
+			actor_loss = - log_prob*tf.stop_gradient(delta)
+			critic_loss = delta**2
 
-	return observations, actions, rewards , total_rewards
-
-@tf.function
-def update(observations, rewards):
-
-	old_obs = observations[:-1]
-	obs = observations[1:]
-
-	r = rewards[:-1]
-	
-	with tf.GradientTape(watch_accessed_variables=True) as tape:
-		v_next = model.get_action(obs)[1]
-		v = model.get_action(old_obs)[1]
-		G = tf.stop_gradient(r + gamma * v_next)
-		advantage = tf.stop_gradient(G - v)
-
-		logits = model(obs)[0]
-		advantage = tf.expand_dims(advantage, 1)
-
-		actor_loss = -tf.reduce_sum(tf.math.log_softmax(logits) *advantage)
-		critic_loss = tf.keras.losses.MSE(G, v)
-
-	grads = tape.gradient([actor_loss, critic_loss], model.trainable_variables)
-	optimizer.apply_gradients(zip(grads, model.trainable_variables))
-
+			total_loss = actor_loss + critic_loss
+		
+		grads1 = tape.gradient(total_loss, self.model.trainable_variables)		
+		self.optimizer.apply_gradients(zip(grads1, self.model.trainable_variables))
 
 if __name__=="__main__":
 	env = gym.make("CartPole-v1")
-	num_actions = env.action_space.n
-	state_shape = env.reset().shape
-	model = Model(num_actions)
-	optimizer = tf.keras.optimizers.Adam()
-	rews = []
+	obs_dims = env.reset().shape[0]
+	n_actions = env.action_space.n
 
+	agent = Agent(obs_dims=obs_dims, num_actions=n_actions, gamma=0.99, learning_rate=0.0003)
 
-	gamma = 0.99
+	n_games = 501
+	scores = []
+	avg_score = []
 
-	with tqdm.trange(5000) as t:
+	with tqdm.trange(n_games) as t:
 		for i in t:
-			observations, actions, rewards, total_rews = get_samples(100)
-			update(observations, rewards)
-			rews.extend(total_rews)
+			done = False
+			score = 0
+			s = env.reset()
+			while not done:
+				a = agent.get_action(s)
+				s_, r, done, info = env.step(a)
+				agent.learn(s, s_, r, done)
+				
+				s = s_
 
-			t.set_description(f"Episode: {i}")
-			t.set_postfix(
-				Highest = np.max(rews),
-				Current = np.mean(total_rews),
-				Average = (np.mean(rews[i:i+100]) if i >=100 else np.mean(rews))
-				)
+				score += r
+			scores.append(score)
+			avg_score = np.mean(scores[max(0, i-100): (i+1)])
+			t.set_description(f"Episode= {i}")
+			t.set_postfix(Average_reward = avg_score
+				 )
+			if i % 50 ==0:
+				env2 = wrappers.Monitor(env, 'D:/My C and Python Projects/Repos/Reinforcement-Learning/Policy Gradients/results/ActorCritc/ActorCritic_episode' + str(i) + '/', force=True)
 
-	avg_100_rewards = [np.mean(rews[i:i+100]) for i in range(len(rews)- 100)]
-	fig = plt.figure()
-	fig.patch.set_facecolor('black')
-	plt.xlabel('Updates')
-	plt.ylabel('Rewards')
+				done = False
+				s = env2.reset()
+				while not done:
+					env2.render()
+					a = agent.get_action(s)
+					s_, r, done, info = env2.step(a)
+					s = s_
+				
+				env2.close()
 
-	plt.plot(rews, label="Rewards", color="dimgray")
-	plt.plot(avg_100_rewards, label="Running Average", color="violet")
-	ax = plt.gca()
-	ax.set_facecolor("black")
-	
-	plt.legend()
-	plt.show()
+
+
+
