@@ -11,7 +11,7 @@ class ActorCritic(Model):
 		super(ActorCritic, self).__init__()
 
 		self.num_actions = num_actions
-		self.fc1 = Dense(256, activation='relu')
+		self.fc1 = Dense(1024, activation='relu')
 		self.fc2 = Dense(256, activation='relu')
 		self.v = Dense(1, activation=None)
 		self.pi = Dense(num_actions, activation='softmax')
@@ -36,13 +36,19 @@ class Agent:
 		self.optimizer= tf.keras.optimizers.Adam(learning_rate=learning_rate)
 
 	def get_action(self, obs):
-		obs = tf.reshape(obs, (-1, self.obs_dims))
+		obs = np.reshape(obs, (-1, self.obs_dims))
 		v, pi = self.model.predict(obs)
+		
+		maxprob = np.max(pi)
+		if np.random.random() < maxprob:
+			action = np.argmax(pi)
 
-		action_probabilities = tfp.distributions.Categorical(probs = pi)
-		action = action_probabilities.sample()
-		self.action = action
-		return action.numpy()[0]
+		else:
+			action = np.random.randint(self.num_actions)
+
+
+		self.action = [action]
+		return action
 
 
 	def learn(self, obs, obs_, reward, done):
@@ -68,15 +74,16 @@ class Agent:
 		self.optimizer.apply_gradients(zip(grads1, self.model.trainable_variables))
 
 if __name__=="__main__":
-	env = gym.make("CartPole-v1")
+	tf.compat.v1.disable_eager_execution()
+	env = gym.make("LunarLander-v2")
 	obs_dims = env.reset().shape[0]
 	n_actions = env.action_space.n
 
-	agent = Agent(obs_dims=obs_dims, num_actions=n_actions, gamma=0.99, learning_rate=0.0003)
+	agent = Agent(obs_dims=obs_dims, num_actions=n_actions, gamma=0.99, learning_rate=0.0009)
 
 	n_games = 501
 	scores = []
-	avg_score = []
+	avg_scores = []
 
 	with tqdm.trange(n_games) as t:
 		for i in t:
@@ -93,6 +100,8 @@ if __name__=="__main__":
 				score += r
 			scores.append(score)
 			avg_score = np.mean(scores[max(0, i-100): (i+1)])
+			avg_scores.append(avg_score)
+
 			t.set_description(f"Episode= {i}")
 			t.set_postfix(Average_reward = avg_score
 				 )
@@ -109,6 +118,11 @@ if __name__=="__main__":
 				
 				env2.close()
 
-
+	plt.title("Actor Critic")
+	plt.xlabel("Episodes")
+	plt.ylabel("Average Rewards")
+	plt.plot(avg_scores)
+	plt.legend()
+	plt.show()
 
 
