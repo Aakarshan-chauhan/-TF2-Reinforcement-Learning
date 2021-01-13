@@ -6,6 +6,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow_probability import distributions
 import gym
 import matplotlib.pyplot as plt
+import wandb
 
 class Policy(Model):
 	def __init__(self, input_dims, num_output):
@@ -66,20 +67,27 @@ class Agent():
 			policyLoss = -tf.reduce_sum(logProbs*returns)
 		policyGrads = tape.gradient(policyLoss, self.model.trainable_variables) 
 		self.optimizer.apply_gradients(zip(policyGrads, self.model.trainable_variables))
-
+		return policyLoss
 
 if __name__ == "__main__":
-	env = gym.make("LunarLander-v2")
-	obs_dims = env.reset().shape[0]
-	n_actions = env.action_space.n
-	gamma = 0.999
-	alpha = 0.00001
+	env = gym.make("CartPole-v0")
+	OBS_DIMS = env.reset().shape[0]
+	N_ACTIONS = env.action_space.n
+	GAMMA = 0.99
+	ALPHA = 0.0001
 	
-	agent = Agent(alpha, gamma, obs_dims, n_actions)
+	agent = Agent(ALPHA, GAMMA, OBS_DIMS, N_ACTIONS)
+
+	wandb.init(project="Reinforce CartPole")
+	wandb.config.OBS_DIMS = OBS_DIMS
+	wandb.config.N_ACTIONS = N_ACTIONS
+	wandb.config.GAMMA = GAMMA
+	wandb.config.ALPHA = ALPHA
 
 	scores = []
 	avg_score = []
-	for i in range(2001):
+	n_games = 1000
+	for i in range(n_games):
 		s = env.reset()
 		done = False
 		
@@ -91,12 +99,13 @@ if __name__ == "__main__":
 			agent.rewardmem.append(r)
 			s = s_
 			
-		agent.train()
+		loss = agent.train()
 		scores.append(np.sum(agent.rewardmem))
 		avg_score.append(np.mean(scores[-50:]))
 		if i%50 == 0 :
 			print(f"Episode : {i}, avg_reward = {avg_score[-1]}")
 		agent.resetmem()
+		wandb.log({"Loss":loss, "Average Reward":avg_score[-1]})
 
 
 	plt.plot(avg_score)

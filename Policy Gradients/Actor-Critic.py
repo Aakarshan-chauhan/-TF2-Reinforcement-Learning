@@ -7,6 +7,8 @@ import tensorflow_probability as tfp
 import numpy as np
 import tqdm
 import matplotlib.pyplot as plt
+import wandb
+
 class Actor(Model):
 	def __init__(self, num_actions):
 		super(Actor, self).__init__()
@@ -79,7 +81,7 @@ class Agent:
 			log_prob = prob.log_prob(action)
 			advantage = target - V
 
-			actor_loss = - tf.reduce_sum(log_prob*advantage)
+			actor_loss = - tf.reduce_mean(log_prob*advantage)
 			critic_loss = tf.reduce_sum(advantage**2)
 
 		agrads = tape.gradient(actor_loss, self.actor.trainable_variables)
@@ -89,16 +91,25 @@ class Agent:
 		self.optimizer.apply_gradients(zip(agrads, self.actor.trainable_variables))
 		self.optimizer.apply_gradients(zip(vgrads, self.critic.trainable_variables))
 		del tape
+		
 
 if __name__=="__main__":
-	#tf.compat.v1.disable_eager_execution()
-	env = gym.make("LunarLander-v1")
-	obs_dims = env.reset().shape[0]
-	n_actions = env.action_space.n
 
-	agent = Agent(obs_dims=obs_dims, num_actions=n_actions, gamma=0.99, learning_rate=0.0001)
+	env = gym.make("CartPole-v0")
+	OBS_DIMS = env.reset().shape[0]
+	N_ACTIONS = env.action_space.n
+	GAMMA = 0.99
+	ALPHA = 0.0002
 
-	n_games = 1001
+	agent = Agent(OBS_DIMS, N_ACTIONS, GAMMA, ALPHA)
+
+	wandb.init(project="Actor Critic CartPole")
+	wandb.config.OBS_DIMS = OBS_DIMS
+	wandb.config.N_ACTIONS = N_ACTIONS
+	wandb.config.GAMMA = GAMMA
+	wandb.config.ALPHA = ALPHA
+
+	n_games = 500
 	scores = []
 	avg_scores = []
 
@@ -119,20 +130,12 @@ if __name__=="__main__":
 			avg_score = np.mean(scores[max(0, i-100): (i+1)])
 			avg_scores.append(avg_score)
 
+			wandb.log({"Average Reward":avg_score})
 			t.set_description(f"Episode= {i}")
 			t.set_postfix(Average_reward = avg_score
 				 )
 			
-			if i % 100 ==0:
-				env2 = wrappers.Monitor(env, './Policy Gradients/results/ActorCritc/ActorCritic_episode' + str(i) + '/', force=True)
-
-				done = False
-				s = env2.reset()
-				while not done:
-					env2.render()
-					a = agent.get_action(s).numpy()
-					s_, r, done, info = env2.step(a)
-					s = s_
+			
 				
 				
 			
