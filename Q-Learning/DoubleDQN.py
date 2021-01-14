@@ -1,163 +1,166 @@
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.optimizers import Adam
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
 import tqdm
+import numpy as np
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import MSE
+import random
 import gym
-from gym import wrappers
-from time import time
+import wandb
 
-class ReplayBuffer():
-	def __init__(self, size, observation_dims, action_dims):
-		self.buffer_size = size
-		
-		self.obs_mem = np.zeros((self.buffer_size, observation_dims))
+
+class ReplayBuffer:
+	def __init__(self, max_size, observation_dims, n_actions):
+		self.max_size = max_size
+		self.obervation_dims = observation_dims
+		self.n_actions = n_actions
+
+		self.obs_mem = np.zeros([self.max_size, observation_dims], dtype=np.float32)
 		self.next_obs_mem = np.zeros_like(self.obs_mem)
-		self.action_mem = np.zeros(self.buffer_size, dtype=np.int64)
-		self.reward_mem = np.zeros(self.buffer_size)
-		self.terminal_mem = np.zeros(self.buffer_size, dtype=np.float32)
 
-		self.buffer_cntr = 0
+		self.action_mem = np.zeros(self.max_size, dtype=np.int64)
+		self.reward_mem = np.zeros(self.max_size, dtype=np.float32)
 
-	def insert_exp(self, obse, obse_, actione, rewarde, terminale):
-		index = int(self.buffer_cntr % self.buffer_size)
+		self.done_mem = np.zeros(self.max_size, dtype=np.float32)
+		self.mem_cntr = 0
 
-		self.obs_mem[index] = obse
-		self.next_obs_mem[index] = obse_
-		self.action_mem[index] = actione 
-		self.reward_mem[index] = rewarde
-		self.terminal_mem[index] = 1 - int(terminale)
+	def store(self, s, a, r, s_, d):
+		index = self.mem_cntr % self.max_size
 
-		self.buffer_cntr +=1
+		self.obs_mem[index] = s
+		self.next_obs_mem[index] = s_
+		self.action_mem[index] = a
+		self.reward_mem[index] = r
+		self.done_mem[index] = d
+		self.mem_cntr += 1
 
-	def get_exp(self, batch_size):
-		max_size = int(min(self.buffer_cntr, self.buffer_size))
-		batch = np.random.choice(max_size, batch_size)
+	def sample(self, batch_size):
+		max_batch = min(self.mem_cntr, self.max_size)
+		batches = np.random.choice(max_batch, batch_size)
 
-		batch_obs = self.obs_mem[batch]
-		batch_obs_ = self.next_obs_mem[batch]
-		batch_action = self.action_mem[batch]
-		batch_reward = self.reward_mem[batch]
-		batch_terminal = self.terminal_mem[batch]
+		s = self.obs_mem[batches]
+		a = self.action_mem[batches]
+		r = self.reward_mem[batches]
+		s_ = self.next_obs_mem[batches]
+		d = self.done_mem[batches]
+		return s, a, r, s_, d
 
-		return batch_obs, batch_obs_, batch_action, batch_reward, batch_terminal
+
+class QNetwork(Model):
+	def __init__(self, n_actions):
+		super(QNetwork, self).__init__()
+		self.d1 = Dense(256, activation='relu')
+		self.d2 = Dense(256, activation='relu')
+		self.q = Dense(n_actions)
+
+	def __call__(self, s, training=None):
+		x = self.d1(s)
+		x = self.d2(x)
+		x = self.q(x)
+		return x
 
 
-def get_DQN(input_shape, output_shape, hidden_units, lr):
-	model = Sequential()
-	model.add(Input(shape=(input_shape,)))
-	for units in hidden_units:
-		model.add(Dense(units, activation='relu'))
-	model.add(Dense(output_shape))
-
-	model.compile(optimizer=Adam(lr=lr), loss='mse')
-	return model
 class Agent():
-	def __init__(self, buffer_size, observation_dims, n_actions, 
-				 batch_size=64, hidden_units=[256, 256], learning_rate=0.0005, 
-				 gamma=.99, epsilon=1.0, epsilon_dec=0.93, epsilon_min=0.01):
-
-		self.buffer = ReplayBuffer(buffer_size, observation_dims, n_actions)
-		self.dqn = get_DQN(observation_dims, n_actions, hidden_units, learning_rate)
-		self.dqn2 = get_DQN(observation_dims, n_actions, hidden_units, learning_rate)
-
+	def __init__(self, obs_dims, n_actions, buffer_size, batch_size, alpha, gamma, epsilon, tau):
+		self.obs_dims = obs_dims
+		self.n_actions = n_actions
+		self.batch_size = batch_size
 		self.gamma = gamma
 		self.e = epsilon
-		self.e_dec = epsilon_dec
-		self.e_min = epsilon_min
-		
-		self.action_array = np.arange(n_actions, dtype=np.int64)
-		self.batch_size = batch_size
+		self.tau = tau
 
-	def insert_exp(self, exp_obs, exp_obs_, exp_action, exp_reward, exp_terminal):
-		self.buffer.insert_exp(exp_obs, exp_obs_, exp_action, exp_reward, exp_terminal)
+		self.buffer = ReplayBuffer(buffer_size, obs_dims, n_actions)
+		self.Q = QNetwork(n_actions)
+		self.targetQ = QNetwork(n_actions)
+		self.Q.compile(optimizer=Adam(learning_rate=alpha), loss='mse')
 
-	def get_action(self, observation):
-		rand = np.random.random()
-		observation = np.expand_dims(observation, 0)
+		self.opt = Adam(learning_rate=alpha)
+		self.update_target_parameters()
 
-		if rand < self.e:	
-			return np.random.choice(self.action_array)
-		q_vals = self.dqn.predict(observation)
-		return np.argmax(q_vals)
+	# @tf.function
+	def get_action(self, s):
+		if random.random() < self.e:
+			return np.random.randint(high=self.n_actions, low=0)
 
+		s = np.reshape(s, (-1, self.obs_dims))
+		q = self.Q.predict(s)
+		return np.argmax(q)
+
+	# @tf.function
 	def learn(self):
-		if self.buffer.buffer_cntr < self.batch_size:
-			return
-		observations, next_observations, actions, rewards, terminates = self.buffer.get_exp(self.batch_size)
-		
-		Q = self.dqn.predict(observations)
-		Q_next = self.dqn2.predict(next_observations)
+		s, a, r, s_, d = self.buffer.sample(self.batch_size)
+
+		self.e = self.e * 0.994
+
+		Q = self.Q.predict(s)
+		Q_next = self.targetQ.predict(s_)
 
 		targets = Q.copy()
 		indices = np.arange(self.batch_size, dtype=np.int64)
 
-		targets[indices, actions] = rewards + self.gamma * np.max(Q_next, axis=1) * terminates
-		
-		_ = self.dqn.fit(observations, targets, verbose=0)
+		targets[indices, a] = r + self.gamma * np.max(Q_next, axis=1) * (1 - d)
 
-		self.e = self.e * self.e_dec if self.e > self.e_min else self.e_min
+		_ = self.Q.fit(s, targets, verbose=0)
 
-	def copy_weights(self):
-		self.dqn2.set_weights(self.dqn.get_weights())
+	# self.update_target_parameters(tau=self.tau)
+	# return tf.reduce_mean(MSE(self.Q.predict(s), Q_next))
 
-if __name__=='__main__':
+	# @tf.function
+	def update_target_parameters(self, tau=1.):
+		self.targetQ.set_weights(self.Q.get_weights())
+
+
+if __name__ == "__main__":
 	tf.compat.v1.disable_eager_execution()
-	env = gym.make("LunarLander-v2")
-	state_dims = env.reset().shape[0]
-	n_actions = env.action_space.n
+	env = gym.make("CartPole-v0")
+	wandb.init(project='DQN CartPole')
 
-	agent = Agent(buffer_size=64, observation_dims=state_dims, n_actions=n_actions)
-	
-	n_games = 501
-	scores = []
-	avg_scores = []
+	OBS_DIMS = env.reset().shape[0]
+	N_ACTIONS = env.action_space.n
+	BUFFER_SIZE = 1000000
+	BATCH_SIZE = 128
+	LEARNING_RATE = 0.001
+	GAMMA = 0.99
+	EPSILON = .8
+	TAU = 0.01
+	agent = Agent(OBS_DIMS, N_ACTIONS, BUFFER_SIZE, BATCH_SIZE, LEARNING_RATE, GAMMA, EPSILON, TAU)
 
-	num_timestep = 0
+	wandb.config.BUFFER_SIZE = BUFFER_SIZE
+	wandb.config.BATCH_SIZE = BATCH_SIZE
+	wandb.config.LEARNING_RATE = LEARNING_RATE
+	wandb.config.GAMMA = GAMMA
+	wandb.config.EPSILON = EPSILON
+	wandb.config.TAU = TAU
+	n_games = 1000
+	episode_rewards = []
+	n_steps = 0
+	L = 0
+	timesteps = 0
+	for i in tqdm.trange(n_games):
 
-	with tqdm.trange(n_games) as t:
+		obs = env.reset()
+		done = False
+		episode_reward = 0.
+		while True:
+			action = agent.get_action(obs)
+			obs_, reward, done, info = env.step(action)
+			agent.buffer.store(obs, action, reward, obs_, done)
+			obs = obs_
 
-		for i in t:
-			done = False
-			score = 0
-			s = env.reset()
+			episode_reward += reward
 
-			while not done:
-				a = agent.get_action(s)
-				s_, r, done, info = env.step(a)
-				agent.insert_exp(s, s_, a, r, done)
-				agent.learn()
-				s = s_
-				score += r
-				
-				num_timestep += 1
-				if num_timestep %100 == 0:
-					agent.copy_weights()
-
-			scores.append(score)
-			avg_score = np.mean(scores[max(0, i-100): (i+1)])
-			avg_scores.append(avg_score)
-			t.set_description(f"Episode= {i}")
-			t.set_postfix(Average_reward = avg_score,
-				 Buffer_Size = agent.buffer.buffer_cntr)
-
-			if i % 50 ==0:
-				env2 = wrappers.Monitor(env, './Policy Gradients/results/DoubleDQN/episode' + str(i) + '/', force=True)
-
+			if done:
 				done = False
-				s = env2.reset()
-				while not done:
-					a = agent.get_action(s)
-					s_, r, done, info = env2.step(a)
-					s = s_
-				
-				env2.close()
+				obs = env.reset()
+				episode_rewards.append(episode_reward)
 
-	plt.title("Deep Q Learning: Lunar Lander")
-	plt.xlabel("Episodes")
-	plt.ylabel("Average Rewards")
-	plt.plot(avg_scores, label="Qlearning")
-	plt.legend()
-	plt.show()
+				avg_reward = np.mean(episode_rewards[-100:])
+				wandb.log({'Episode Reward': episode_reward, 'avg_rewards': avg_reward, 'Q Loss': L, 'eps': agent.e})
+				episode_reward = 0
+				if agent.buffer.mem_cntr > BATCH_SIZE:
+					L = agent.learn()
+					if timesteps % 15 == 0:
+						agent.update_target_parameters()
+					break
+			timesteps += 1
