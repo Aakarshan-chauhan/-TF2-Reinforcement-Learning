@@ -1,6 +1,4 @@
-from keras.models import Sequential
-from keras.layers import Dense, Input
-from keras.optimizers import Adam
+
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,7 +6,9 @@ import tqdm
 import gym
 from gym import wrappers
 from time import time
-
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.optimizers import Adam
 class ReplayBuffer():
 	def __init__(self, size, observation_dims, action_dims):
 		self.buffer_size = size
@@ -71,6 +71,8 @@ class Agent():
 		self.action_array = np.arange(n_actions, dtype=np.int64)
 		self.batch_size = batch_size
 
+		self.optimizer = tf.keras.optimizers.Adam(learning_rate = learning_rate)
+
 	def insert_exp(self, exp_obs, exp_obs_, exp_action, exp_reward, exp_terminal):
 		self.buffer.insert_exp(exp_obs, exp_obs_, exp_action, exp_reward, exp_terminal)
 
@@ -88,22 +90,21 @@ class Agent():
 			return
 		observations, next_observations, actions, rewards, terminates = self.buffer.get_exp(self.batch_size)
 		
-		Q = self.dqn.predict(observations)
+		targets = self.dqn.predict(observations)
 		Q_next = self.dqn.predict(next_observations)
 
-		targets = Q.copy()
+		#targets = Q.copy()
 		indices = np.arange(self.batch_size, dtype=np.int64)
 
 		targets[indices, actions] = rewards + self.gamma * np.max(Q_next, axis=1) * terminates
 		
-		_ = self.dqn.fit(observations, targets, verbose=0)
+		self.dqn.fit(observations, targets, verbose=0)
+
 
 		self.e = self.e * self.e_dec if self.e > self.e_min else self.e_min
-
-
 if __name__=='__main__':
 	tf.compat.v1.disable_eager_execution()
-	env = gym.make("LunarLander-v2")
+	env = gym.make("CartPole-v0")
 	state_dims = env.reset().shape[0]
 	n_actions = env.action_space.n
 
@@ -133,17 +134,6 @@ if __name__=='__main__':
 			t.set_postfix(Average_reward = avg_score,
 				 Buffer_Size = agent.buffer.buffer_cntr)
 
-			if i % 50 ==0:
-				env2 = wrappers.Monitor(env, './Policy Gradients/results/DQN/episode' + str(i) + '/', force=True)
-
-				done = False
-				s = env2.reset()
-				while not done:
-					a = agent.get_action(s)
-					s_, r, done, info = env2.step(a)
-					s = s_
-				
-				env2.close()
 
 	plt.title("Deep Q Learning: Lunar Lander")
 	plt.xlabel("Episodes")
