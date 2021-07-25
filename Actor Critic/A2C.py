@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import wandb
 import tqdm
 import gym
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
 class Actor(Model):
 	def __init__(self, n_actions):
@@ -82,18 +83,19 @@ if __name__ == "__main__":
 	
 	env = gym.make("CartPole-v0")
 	
-	ALPHA = 0.0006
+	ALPHA = 0.0009
 	GAMMA = 0.999
 	N_ACTIONS = env.action_space.n
 	
 	agent = Agent(N_ACTIONS , ALPHA, GAMMA)
 
-	wandb.init(project="A2C Cart Pole")
+	wandb.init(project="CartPole")
 	wandb.config.ALPHA = ALPHA
 	wandb.config.GAMMA = GAMMA
 	
-	n_steps = 300
-
+	n_steps = 500
+	
+	video_recorder = VideoRecorder(env, "Results/A2C-CartPole.mp4")
 	reward_mem = []
 	for t in range(n_steps):
 		states = []
@@ -104,6 +106,7 @@ if __name__ == "__main__":
 
 		s = env.reset()
 		done = False
+
 		while not done:
 			a = agent.get_action(s)[0].numpy()
 			next_s, r, done, info = env.step(a)
@@ -126,5 +129,18 @@ if __name__ == "__main__":
 		reward_mem.append(np.sum(rewards))
 		Closs, Aloss = agent.learn(states, actions, rewards)
 		
-		wandb.log({"Critic Loss":Closs, "Actor Loss":Aloss, "Average Reward":np.mean(reward_mem[-100:])})
+		wandb.log({"Critic Loss":Closs, "Actor Loss":Aloss, "Average Reward":np.mean(reward_mem[-50:])})
 		print(f"Episode {t} : {np.sum(rewards)}")
+
+
+	s = env.reset()
+	for _ in range(200):
+		a = agent.get_action(s)[0].numpy()
+		env.render()
+		video_recorder.capture_frame()
+		next_s, r, done, info = env.step(a)
+
+		s = next_s
+	video_recorder.close()
+	video_recorder.enabled = False
+	env.close()

@@ -7,6 +7,8 @@ from tensorflow_probability import distributions
 import gym
 import matplotlib.pyplot as plt
 import wandb
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
+
 
 class Policy(Model):
 	def __init__(self, input_dims, num_output):
@@ -78,7 +80,8 @@ if __name__ == "__main__":
 	
 	agent = Agent(ALPHA, GAMMA, OBS_DIMS, N_ACTIONS)
 
-	wandb.init(project="Reinforce CartPole")
+	video_recorder = VideoRecorder(env, "Results/Reinforce-CartPole.mp4")
+	wandb.init(project="CartPole")
 	wandb.config.OBS_DIMS = OBS_DIMS
 	wandb.config.N_ACTIONS = N_ACTIONS
 	wandb.config.GAMMA = GAMMA
@@ -86,7 +89,7 @@ if __name__ == "__main__":
 
 	scores = []
 	avg_score = []
-	n_games = 1000
+	n_games = 500
 	for i in range(n_games):
 		s = env.reset()
 		done = False
@@ -107,6 +110,17 @@ if __name__ == "__main__":
 		agent.resetmem()
 		wandb.log({"Loss":loss, "Average Reward":avg_score[-1]})
 
+	s = env.reset()
+	
+	for __ in range(200) :
+		a = agent.get_action(s).numpy()
+
+		env.render()
+		video_recorder.capture_frame()
+		s, _, _, _ = env.step(a)
+	video_recorder.close()
+	video_recorder.enabled = False
+	env.close()
 
 	plt.plot(avg_score)
 	plt.show()

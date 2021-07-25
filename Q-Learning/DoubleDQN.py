@@ -8,6 +8,7 @@ from tensorflow.keras.losses import MSE
 import random
 import gym
 import wandb
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
 
 class ReplayBuffer:
@@ -114,7 +115,7 @@ class Agent():
 if __name__ == "__main__":
 	tf.compat.v1.disable_eager_execution()
 	env = gym.make("CartPole-v0")
-	wandb.init(project='DQN CartPole')
+	wandb.init(project='CartPole')
 
 	OBS_DIMS = env.reset().shape[0]
 	N_ACTIONS = env.action_space.n
@@ -132,11 +133,14 @@ if __name__ == "__main__":
 	wandb.config.GAMMA = GAMMA
 	wandb.config.EPSILON = EPSILON
 	wandb.config.TAU = TAU
-	n_games = 1000
+	n_games = 500
 	episode_rewards = []
 	n_steps = 0
 	L = 0
 	timesteps = 0
+
+	video_recorder = VideoRecorder(env,path = "Results/DDQN.mp4")
+
 	for i in tqdm.trange(n_games):
 
 		obs = env.reset()
@@ -155,8 +159,8 @@ if __name__ == "__main__":
 				obs = env.reset()
 				episode_rewards.append(episode_reward)
 
-				avg_reward = np.mean(episode_rewards[-100:])
-				wandb.log({'Episode Reward': episode_reward, 'avg_rewards': avg_reward, 'Q Loss': L, 'eps': agent.e})
+				avg_reward = np.mean(episode_rewards[-50:])
+				wandb.log({'Average Reward': avg_reward, 'Loss': L})
 				episode_reward = 0
 				if agent.buffer.mem_cntr > BATCH_SIZE:
 					L = agent.learn()
@@ -164,3 +168,14 @@ if __name__ == "__main__":
 						agent.update_target_parameters()
 					break
 			timesteps += 1
+
+	s = env.reset()
+	for _ in range(200):
+		action = agent.get_action(s)
+		env.render()
+		video_recorder.capture_frame()
+		s , r, d, i = env.step(action)
+
+	env.close()
+	video_recorder.close()
+	video_recorder.enabled = False

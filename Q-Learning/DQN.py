@@ -1,10 +1,11 @@
-
+import wandb
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import tqdm
 import gym
-from gym import wrappers
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
+
 from time import time
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Input
@@ -57,7 +58,7 @@ def get_DQN(input_shape, output_shape, hidden_units, lr):
 
 class Agent():
 	def __init__(self, buffer_size, observation_dims, n_actions, 
-				 batch_size=64, hidden_units=[256, 256], learning_rate=0.0005, 
+				 batch_size=64, hidden_units=[256, 256], learning_rate=0.001, 
 				 gamma=.99, epsilon=1.0, epsilon_dec=0.93, epsilon_min=0.01):
 
 		self.buffer = ReplayBuffer(buffer_size, observation_dims, n_actions)
@@ -110,9 +111,11 @@ if __name__=='__main__':
 
 	agent = Agent(buffer_size=64, observation_dims=state_dims, n_actions=n_actions)
 	
-	n_games = 501
+	n_games = 500
 	scores = []
 	avg_scores = []
+	wandb.init(project="CartPole")
+	video_recorder = VideoRecorder(env, path="Results/DQN.mp4")
 	with tqdm.trange(n_games) as t:
 		for i in t:
 			done = False
@@ -128,16 +131,22 @@ if __name__=='__main__':
 				score += r
 
 			scores.append(score)
-			avg_score = np.mean(scores[max(0, i-100): (i+1)])
+			avg_score = np.mean(scores[max(0, i-50): (i+1)])
 			avg_scores.append(avg_score)
 			t.set_description(f"Episode= {i}")
 			t.set_postfix(Average_reward = avg_score,
 				 Buffer_Size = agent.buffer.buffer_cntr)
+			wandb.log({"Average Reward": avg_scores[-1]})
+
+	s = env.reset()
+	for _ in range(200):
+		a = agent.get_action(s)
+		env.render()
+		video_recorder.capture_frame()
+		s, r, d, i = env.step(a)
+
+	env.close()
+	video_recorder.close()
+	video_recorder.enabled = False
 
 
-	plt.title("Deep Q Learning: Lunar Lander")
-	plt.xlabel("Episodes")
-	plt.ylabel("Average Rewards")
-	plt.plot(avg_scores, label="Qlearning")
-	plt.legend()
-	plt.show()

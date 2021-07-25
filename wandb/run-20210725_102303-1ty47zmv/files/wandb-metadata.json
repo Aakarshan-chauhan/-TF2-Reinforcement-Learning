@@ -1,0 +1,18 @@
+{
+    "os": "Windows-10-10.0.19043-SP0",
+    "python": "3.9.5",
+    "heartbeatAt": "2021-07-25T04:53:06.667188",
+    "startedAt": "2021-07-25T04:53:03.353060",
+    "docker": null,
+    "gpu": "NVIDIA GeForce GTX 1050 Ti",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "D:\\My C and Python Projects\\Repos\\Reinforcement-Learning\\Q-Learning\\DoubleDQN.py",
+    "codePath": "Q-Learning\\DoubleDQN.py",
+    "host": "DESKTOP-M4SNVUR",
+    "username": "Aakarshan",
+    "executable": "D:\\Users\\Aakarshan\\miniconda3\\envs\\tf\\python.exe"
+}

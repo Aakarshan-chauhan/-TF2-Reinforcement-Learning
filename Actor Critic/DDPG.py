@@ -8,7 +8,7 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 import tensorflow_probability as tfp
 import wandb
-
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 class ReplayBuffer:
 	'''
 	Replay Buffer: Stores and samples trajectrories (States, actions, rewards, next states and done flags)
@@ -183,7 +183,7 @@ class Agent:
 
 			Grad = tape.gradient(actorLoss, self.actor.trainable_variables)
 		self.actor.optimizer.apply_gradients(zip(Grad, self.actor.trainable_variables))
-
+		return actorLoss
 	
 	def update_critic(self, state, action, yi):
 		self.critic.fit(tf.concat([state, action],axis=1), yi, verbose=0)
@@ -193,20 +193,20 @@ if __name__ == "__main__":
 	
 	env = gym.make("Pendulum-v0")
 	
-	ALPHA = 1e-3
+	ALPHA = 1e-4
 	BETA = 1e-3
 	GAMMA = 0.99
 	TAU = 0.005
 	BUFFER_SIZE = 1000000
-	NOISE = 0.0
+	NOISE = 0.1
 	BATCH_SIZE = 64
 	OBS_DIMS = env.observation_space.shape[0]
 	N_ACTIONS = env.action_space.shape[0]
-	env2 = gym.make("Pendulum-v0")
+
 	agent = Agent(OBS_DIMS, N_ACTIONS, env, BUFFER_SIZE, BATCH_SIZE, ALPHA, BETA, GAMMA, TAU, NOISE)
 
 
-	wandb.init(project="DDPG Pendulum")
+	wandb.init(project="Pendulum")
 	wandb.config.alpha= ALPHA
 	wandb.config.beta = BETA
 	wandb.config.gamma = GAMMA
@@ -214,54 +214,61 @@ if __name__ == "__main__":
 	wandb.config.noise = 0.0
 	wandb.config.batch_size = BATCH_SIZE
 
-	n_games = 250
+	n_games = 500
 
 	best_score = env.reward_range[0]
 
 	score_history = []
 	mean_score = []
-	for k in range(1):
-		with tqdm.trange(n_games) as t:
+	
+	video_recorder = VideoRecorder(env, path="Results/DDPG.mp4")
 
-			for i in t:
-				observation = env.reset()
-				done = False
-				score = 0
-				episode_steps = 0	
-				while True:
-					action = agent.choose_action(observation, False).numpy()
-					observation_, reward, done, info = env.step(action)
-					score += reward
-					agent.remember(observation, action, reward, observation_, done)
-					ActorLoss, CriticLoss = agent.learn()
-					episode_steps+=1
-					observation = observation_
-					if done:
-						score_history.append(score)
-						mean_score.append(np.mean(score_history[-100: ]))
+	with tqdm.trange(n_games) as t:
 
-						score = 0
+		for i in t:
+			observation = env.reset()
+			done = False
+			score = 0
+			episode_steps = 0	
+			while True:
+				action = agent.choose_action(observation, False).numpy()
+				observation_, reward, done, info = env.step(action)
+				score += reward
+				agent.remember(observation, action, reward, observation_, done)
+				ActorLoss, CriticLoss = agent.learn()
+				episode_steps+=1
+				observation = observation_
+				if done:
+					score_history.append(score)
+					mean_score.append(np.mean(score_history[-100: ]))
+
+					score = 0
 						
 
-						done = False
-						observation = env.reset()
+					done = False
+					observation = env.reset()
 						
-						t.set_postfix_str(f" Episode : {i}, score: {np.mean(score_history[-100:])}")
-						break
+					t.set_postfix_str(f" Episode : {i}, score: {np.mean(score_history[-100:])}")
+					break
 					
 					
 
-				wandb.log({"Mean Score":mean_score[-1], "Actor Loss":ActorLoss, "Critic Loss": CriticLoss, "Scores":score_history[-1]})
-				if i %50 == 0:
-					observation = env2.reset()
-					while not done:
-						env2.render()
-						action = agent.choose_action(observation, False).numpy()
-						observation, reward, done, info = env2.step(action)
-		env.close()
-		env2.close()
-		plt.plot(mean_score, label=f"Mean Scores{t}")
-		plt.plot(score_history, label=f"All Scores{t}")
+			wandb.log({"Average Reward":mean_score[-1], "Actor Loss":ActorLoss, "Critic Loss": CriticLoss, "Scores":score_history[-1]})
+		
+			
+		
+	observation = env.reset()
+	for _ in range(200):
+		env.render()
+		video_recorder.capture_frame()
+		action = agent.choose_action(observation, False).numpy()
+		observation, reward, done, info = env.step(action)
+	env.close()
+	video_recorder.close()
+	video_recorder.enabled = False
+
+	plt.plot(mean_score, label=f"Mean Scores{t}")
+	plt.plot(score_history, label=f"All Scores{t}")
 		
 	plt.show()
 	plt.legend()

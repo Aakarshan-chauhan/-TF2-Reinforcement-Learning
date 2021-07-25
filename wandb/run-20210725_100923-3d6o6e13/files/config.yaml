@@ -1,0 +1,30 @@
+wandb_version: 1
+
+ALPHA:
+  desc: null
+  value: 0.0001
+GAMMA:
+  desc: null
+  value: 0.99
+N_ACTIONS:
+  desc: null
+  value: 2
+OBS_DIMS:
+  desc: null
+  value: 4
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.11.0
+    framework: tensorflow
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.9.5
+    t:
+      1:
+      - 3
+      4: 3.9.5
+      5: 0.11.0
+      8:
+      - 3
+      - 5
